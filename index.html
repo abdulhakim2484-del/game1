@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smoke Slayer: Endless Runner 3D</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050508;
+            color: #fff;
+        }
+        #webgl-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        /* HUD UI */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+        }
+        .top-hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .score-box {
+            background: rgba(15, 15, 25, 0.85);
+            border: 2px solid #00e5ff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+        }
+        .score-val {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00e5ff;
+        }
+        .controls-hint {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        /* Quiz Panel Overlay */
+        #quiz-modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 500px;
+            background: rgba(15, 15, 25, 0.95);
+            border: 2px solid #ff0055;
+            box-shadow: 0 0 25px rgba(255, 0, 85, 0.5);
+            border-radius: 12px;
+            padding: 20px;
+            z-index: 20;
+            display: none;
+            pointer-events: auto;
+        }
+        .quiz-header {
+            color: #ff0055;
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .quiz-question {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        .options-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .btn-opt {
+            background: #1f1f2e;
+            border: 1px solid #3d3d5c;
+            color: #fff;
+            padding: 12px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .btn-opt:hover {
+            background: #ff0055;
+            border-color: #ff0055;
+            font-weight: bold;
+        }
+        .timer-bar-bg {
+            width: 100%;
+            height: 6px;
+            background: #222;
+            border-radius: 3px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        .timer-bar-fill {
+            width: 100%;
+            height: 100%;
+            background: #ff0055;
+        }
+
+        /* Start / Game Over Screen */
+        #screen-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 5, 8, 0.9);
+            z-index: 30;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+        }
+        .title {
+            font-size: 42px;
+            font-weight: 900;
+            color: #ff0055;
+            text-shadow: 0 0 15px rgba(255, 0, 85, 0.6);
+            margin-bottom: 5px;
+            text-align: center;
+        }
+        .subtitle {
+            color: #aaa;
+            margin-bottom: 25px;
+            font-size: 16px;
+            text-align: center;
+        }
+        .btn-main {
+            background: #00e5ff;
+            color: #000;
+            border: none;
+            padding: 14px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.5);
+            transition: transform 0.2s;
+        }
+        .btn-main:hover {
+            transform: scale(1.05);
+            background: #00b3cc;
+        }
+    </style>
+    <!-- Library Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="webgl-container"></div>
+
+    <div class="ui-layer">
+        <div class="top-hud">
+            <div class="score-box">
+                <div style="font-size: 11px; color: #aaa;">SKOR</div>
+                <div id="score-text" class="score-val">0</div>
+            </div>
+            <div class="controls-hint">
+                A / D / Panah : Pindah Lane | W / Spasi : Lompat | S : Meluncur
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Kuis -->
+    <div id="quiz-modal">
+        <div class="quiz-header">Edu-Quiz Item Found!</div>
+        <div class="timer-bar-bg">
+            <div id="quiz-timer" class="timer-bar-fill"></div>
+        </div>
+        <div id="quiz-q" class="quiz-question">Pertanyaan kuis...</div>
+        <div id="quiz-options" class="options-grid"></div>
+    </div>
+
+    <!-- Overlay Menu / GameOver -->
+    <div id="screen-overlay">
+        <h1 id="menu-title" class="title">SMOKE SLAYER</h1>
+        <p id="menu-sub" class="subtitle">Subway Runner Edition - Edukasi Bahaya Merokok</p>
+        <button id="btn-action" class="btn-main" onclick="startApp()">MULAI MAIN</button>
+    </div>
+
+    <script>
+        // --- BANK SOAL EDUKASI BAHAYA MEROKOK ---
+        const quizBank = [
+            {
+                q: "Zat adiktif utama dalam rokok yang memicu kecanduan dan penyempitan pembuluh darah adalah...",
+                opts: ["Tar", "Nikotin", "Karbon Monoksida", "Formaldehida"],
+                ans: 1
+            },
+            {
+                q: "Gas beracun hasil pembakaran rokok yang mengurangi kadar oksigen dalam darah adalah...",
+                opts: ["Amonia", "Arsenik", "Karbon Monoksida", "Benzena"],
+                ans: 2
+            },
+            {
+                q: "Zat lengket dalam rokok yang mengendap di paru-paru dan bersifat karsinogenik adalah...",
+                opts: ["Tar", "Nikotin", "Aseton", "Sianida"],
+                ans: 0
+            },
+            {
+                q: "Residu asap rokok yang tertinggal di baju, dinding, atau furnitur disebut...",
+                opts: ["Firsthand Smoke", "Secondhand Smoke", "Thirdhand Smoke", "Freehand Smoke"],
+                ans: 2
+            },
+            {
+                q: "Penyakit kronis ditandai kerusakan kantung udara (alveolus) paru-paru akibat merokok adalah...",
+                opts: ["Asma", "Emfisema (PPOK)", "TBC", "Pneumonia"],
+                ans: 1
+            },
+            {
+                q: "Apakah filter pada rokok membuat rokok menjadi 100% aman?",
+                opts: ["Ya, menyaring semua racun", "Tidak, gas beracun & nikotin tetap terhirup", "Ya, mengubah racun jadi uap", "Ya, aman bagi jantung"],
+                ans: 1
+            }
+        ];
+
+        // --- GAME ENGINE SETUP ---
+        let scene, camera, renderer;
+        let player, playerGroup;
+        let lanes = [-3.5, 0, 3.5];
+        let currentLane = 1; // 0: Kiri, 1: Tengah, 2: Kanan
+        let targetX = 0;
+        
+        let isJumping = false;
+        let jumpVelocity = 0;
+        let isSliding = false;
+        let slideTimer = 0;
+        
+        let obstacles = [];
+        let quizItems = [];
+        let score = 0;
+        let speed = 0.4;
+        let isGameRunning = false;
+        let isQuizActive = false;
+
+        let quizTimerInterval = null;
+        let quizTimeLeft = 7;
+
+        function init3D() {
+            const container = document.getElementById('webgl-container');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050508);
+            scene.fog = new THREE.FogExp2(0x050508, 0.015);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, 10);
+            camera.lookAt(0, 2, -10);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            // Pencahayaan
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0x00e5ff, 0.8);
+            dirLight.position.set(10, 20, 10);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            createTrack();
+            createPlayer();
+
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', handleKeyDown);
+        }
+
+        function createTrack() {
+            // Jalur Utama / Jalan
+            const roadGeo = new THREE.PlaneGeometry(12, 1000);
+            const roadMat = new THREE.MeshStandardMaterial({ color: 0x111118, roughness: 0.8 });
+            const road = new THREE.Mesh(roadGeo, roadMat);
+            road.rotation.x = -Math.PI / 2;
+            road.position.z = -450;
+            road.receiveShadow = true;
+            scene.add(road);
+
+            // Garis Pembatas Lane (Glow Lines)
+            for (let i of [-1.75, 1.75]) {
+                const lineGeo = new THREE.PlaneGeometry(0.1, 1000);
+                const lineMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
+                const line = new THREE.Mesh(lineGeo, lineMat);
+                line.rotation.x = -Math.PI / 2;
+                line.position.set(i, 0.01, -450);
+                scene.add(line);
+            }
+        }
+
+        function createPlayer() {
+            playerGroup = new THREE.Group();
+
+            // Badan Karakter (Health Hunter)
+            const bodyGeo = new THREE.BoxGeometry(1, 1.6, 0.8);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x00e5ff });
+            player = new THREE.Mesh(bodyGeo, bodyMat);
+            player.position.y = 1;
+            player.castShadow = true;
+            playerGroup.add(player);
+
+            // Kepala
+            const headGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 2.1;
+            playerGroup.add(head);
+
+            playerGroup.position.set(lanes[currentLane], 0, 0);
+            scene.add(playerGroup);
+        }
+
+        function spawnObstacle() {
+            const laneIdx = Math.floor(Math.random() * 3);
+            const isTall = Math.random() > 0.5;
+
+            const geo = isTall ? new THREE.BoxGeometry(2, 3, 1) : new THREE.BoxGeometry(2, 1.2, 1);
+            const mat = new THREE.MeshStandardMaterial({ color: 0xff0055 });
+            const obs = new THREE.Mesh(geo, mat);
+            
+            obs.position.set(lanes[laneIdx], isTall ? 1.5 : 0.6, -100);
+            obs.castShadow = true;
+            obs.userData = { isTall: isTall };
+            
+            scene.add(obs);
+            obstacles.push(obs);
+        }
+
+        function spawnQuizItem() {
+            const laneIdx = Math.floor(Math.random() * 3);
+            
+            // Item berbentuk Sphere / Orb bercahaya emas
+            const geo = new THREE.SphereGeometry(0.7, 16, 16);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+            const item = new THREE.Mesh(geo, mat);
+
+            item.position.set(lanes[laneIdx], 1.2, -120);
+            scene.add(item);
+            quizItems.push(item);
+        }
+
+        function handleKeyDown(e) {
+            if (!isGameRunning || isQuizActive) return;
+
+            if ((e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') && currentLane > 0) {
+                currentLane--;
+            } else if ((e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') && currentLane < 2) {
+                currentLane++;
+            } else if ((e.key === 'w' || e.key === 'W' || e.key === ' ' || e.key === 'ArrowUp') && !isJumping) {
+                isJumping = true;
+                jumpVelocity = 0.25;
+            } else if ((e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') && !isSliding) {
+                isSliding = true;
+                slideTimer = 30;
+            }
+
+            targetX = lanes[currentLane];
+        }
+
+        function updateGame() {
+            if (!isGameRunning || isQuizActive) return;
+
+            // Pergerakan X (Smooth Shift)
+            playerGroup.position.x += (targetX - playerGroup.position.x) * 0.2;
+
+            // Lompat
+            if (isJumping) {
+                playerGroup.position.y += jumpVelocity;
+                jumpVelocity -= 0.015; // Gravitasi
+                if (playerGroup.position.y <= 0) {
+                    playerGroup.position.y = 0;
+                    isJumping = false;
+                }
+            }
+
+            // Meluncur (Slide)
+            if (isSliding) {
+                player.scale.y = 0.5;
+                player.position.y = 0.5;
+                slideTimer--;
+                if (slideTimer <= 0) {
+                    isSliding = false;
+                    player.scale.y = 1.0;
+                    player.position.y = 1;
+                }
+            }
+
+            // Spawn Obstacles & Items
+            if (Math.random() < 0.02) spawnObstacle();
+            if (Math.random() < 0.008) spawnQuizItem();
+
+            // Update Obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obs = obstacles[i];
+                obs.position.z += speed;
+
+                // Cek Tabrakan
+                if (Math.abs(obs.position.z - playerGroup.position.z) < 1.0 &&
+                    Math.abs(obs.position.x - playerGroup.position.x) < 1.2) {
+                    
+                    let hit = false;
+                    if (obs.userData.isTall && !isSliding) hit = true;
+                    if (!obs.userData.isTall && playerGroup.position.y < 1.2) hit = true;
+
+                    if (hit) {
+                        gameOver();
+                        return;
+                    }
+                }
+
+                if (obs.position.z > 10) {
+                    scene.remove(obs);
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            // Update Quiz Items
+            for (let i = quizItems.length - 1; i >= 0; i--) {
+                let item = quizItems[i];
+                item.position.z += speed;
+                item.rotation.y += 0.05;
+
+                // Ambil Item Kuis
+                if (Math.abs(item.position.z - playerGroup.position.z) < 1.2 &&
+                    Math.abs(item.position.x - playerGroup.position.x) < 1.2) {
+                    
+                    scene.remove(item);
+                    quizItems.splice(i, 1);
+                    triggerQuiz();
+                    return;
+                }
+
+                if (item.position.z > 10) {
+                    scene.remove(item);
+                    quizItems.splice(i, 1);
+                }
+            }
+
+            // Tambah Skor
+            score += 1;
+            document.getElementById('score-text').innerText = score;
+            speed += 0.00005; // Bertambah cepat perlahan
+        }
+
+        function triggerQuiz() {
+            isQuizActive = true;
+            const qObj = quizBank[Math.floor(Math.random() * quizBank.length)];
+
+            document.getElementById('quiz-q').innerText = qObj.q;
+            const optGrid = document.getElementById('quiz-options');
+            optGrid.innerHTML = '';
+
+            qObj.opts.forEach((optText, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-opt';
+                btn.innerText = `${String.fromCharCode(65 + idx)}. ${optText}`;
+                btn.onclick = () => handleQuizAnswer(idx === qObj.ans);
+                optGrid.appendChild(btn);
+            });
+
+            document.getElementById('quiz-modal').style.display = 'block';
+            
+            // Timer Kuis
+            quizTimeLeft = 7;
+            const timerFill = document.getElementById('quiz-timer');
+            timerFill.style.width = '100%';
+
+            clearInterval(quizTimerInterval);
+            quizTimerInterval = setInterval(() => {
+                quizTimeLeft -= 0.1;
+                timerFill.style.width = Math.max(0, (quizTimeLeft / 7) * 100) + '%';
+
+                if (quizTimeLeft <= 0) {
+                    clearInterval(quizTimerInterval);
+                    handleQuizAnswer(false);
+                }
+            }, 100);
+        }
+
+        function handleQuizAnswer(isCorrect) {
+            clearInterval(quizTimerInterval);
+            document.getElementById('quiz-modal').style.display = 'none';
+            isQuizActive = false;
+
+            if (isCorrect) {
+                score += 500; // Bonus skor besar jika benar
+            } else {
+                score = Math.max(0, score - 200); // Penalti jika salah
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            updateGame();
+            renderer.render(scene, camera);
+        }
+
+        function startApp() {
+            document.getElementById('screen-overlay').style.display = 'none';
+            resetGame();
+            isGameRunning = true;
+        }
+
+        function resetGame() {
+            // Hapus rintangan & item lama
+            obstacles.forEach(o => scene.remove(o));
+            quizItems.forEach(q => scene.remove(q));
+            obstacles = [];
+            quizItems = [];
+
+            score = 0;
+            speed = 0.4;
+            currentLane = 1;
+            targetX = lanes[currentLane];
+            playerGroup.position.set(0, 0, 0);
+            document.getElementById('score-text').innerText = '0';
+        }
+
+        function gameOver() {
+            isGameRunning = false;
+            document.getElementById('screen-overlay').style.display = 'flex';
+            document.getElementById('menu-title').innerText = "GAME OVER";
+            document.getElementById('menu-sub').innerText = `Skor Akhir Anda: ${score}`;
+            document.getElementById('btn-action').innerText = "MAIN LAGI";
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Jalankan Inisialisasi
+        init3D();
+        animate();
+    </script>
+</body>
+</html>
